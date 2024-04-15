@@ -14,6 +14,8 @@ from math import isclose
 
 import matplotlib.pyplot as plt
 import numpy as np
+from astropy import units as u
+from astropy import constants as const
 from scipy import constants as sciconst
 from scipy.optimize import fmin
 from scipy.stats import iqr
@@ -447,6 +449,25 @@ def decimal_place_counter(value: float):
     return decimal_places
 
 
+def period_to_radius(period):
+    r = np.cbrt(period ** 2) # AU
+
+    return r
+
+
+def radius_to_planet_velocity(radius):
+    planet_velocity = np.sqrt((sciconst.G * STAR_MASS * const.GM_sun) / (
+        radius))
+
+    return planet_velocity
+
+
+def planet_mass_calculator(star_velocity, planet_velocity):
+    planet_mass = (STAR_MASS * star_velocity)/planet_velocity
+
+    return planet_mass
+
+
 def main() -> None:
     """
     Main function. Calls all other functions and prints main output.
@@ -459,15 +480,8 @@ def main() -> None:
 
     optimiser.counter = 0  # initialise counter
 
-    # List of functions usable by the optimiser.
-    function_array = [
-        chi_squared_func,
-        data_filterer,
-        wavelength_function,
-    ]
-
     optimised_parameters_list, data, chi, chi_r = optimiser(
-        function_list=function_array,
+        function_list=[chi_squared_func, data_filterer, wavelength_function],
         parameter_guess_list=INIT_PARAMETER_ARRAY,
         data_array=data)
 
@@ -507,6 +521,16 @@ def main() -> None:
           f"Phase: ({phase} +/- {error_p}) rad\n"
           f"Chi^2 = {chi:.3f}\n"
           f"Reduced Chi^2 = {chi_r:.3f}")
+
+    period = 2*np.pi / angular
+    radius = period_to_radius(period)
+    planet_velocity = radius_to_planet_velocity(radius)
+    planet_mass = planet_mass_calculator(velocity, planet_velocity)
+
+    print(f"Orbital radius = {radius}\n"
+          f"Planet velocity = {planet_velocity}m/s\n"
+          f"Planet mass = {planet_mass}M_s")
+
 
     continuous_time = np.linspace(np.floor(data[0, 0]), np.ceil(data[-1, 0]),
                                   len(data) * 1000)
