@@ -14,9 +14,7 @@ from math import isclose
 
 import matplotlib.pyplot as plt
 import numpy as np
-from astropy import units as u
-from astropy import constants as const
-from scipy import constants as sciconst
+from scipy.constants import c, G
 from scipy.optimize import fmin
 from scipy.stats import iqr
 
@@ -26,11 +24,11 @@ SIGMA_TO_CHI_DIFFERENCE = {
     2: 2.71
 }
 SIGMA_TO_TOLERANCE = {
-    1: 0.15,
-    2: 0.25
+    1: 0.2,
+    2: 0.1,
 }
 INCLINATION_ANGLE = 90  # degrees
-INCLINATION_FACTOR = 1 #np.sin(INCLINATION_ANGLE * (np.pi/180))
+INCLINATION_FACTOR = np.sin(INCLINATION_ANGLE * (np.pi/180))
 INIT_PARAMETER_ARRAY = [[
     50,  # Velocity
     3e-8 * 365 * 24 * 3600,  # rad/s -> rad/year
@@ -38,6 +36,8 @@ INIT_PARAMETER_ARRAY = [[
 ]]
 EMITTED_WAVELENGTH = 656.281  # nanometres
 STAR_MASS = 2.78
+M_SUN = 1.98840987e+30
+AU = 1.49597871e+11
 
 # Data
 FILE_LIST = [
@@ -113,7 +113,7 @@ def wavelength_function(parameters: list, time):
         the 'time' parameter.
 
     """
-    wavelength = ((1 + (parameters[0] / sciconst.c) * np.sin(
+    wavelength = ((1 + (parameters[0] / c) * np.sin(
         parameters[1] * time + parameters[2]) * INCLINATION_FACTOR) *
         EMITTED_WAVELENGTH)
 
@@ -158,7 +158,7 @@ def data_filterer(data_array, parameters, predicted_function):
     NaN data points and data points with zero error are also removed.
 
     In all other iterations, the function calculates the z score of each data
-    point, with the value of the fitted function at that point being used as 
+    point, with the value of the fitted function at that point being used as
     the mean.
 
     Parameters
@@ -242,17 +242,17 @@ def data_point_plotter(data_array, predicted_function, parameters, time):
 
     # Main plot
     fig = plt.figure(figsize=(8, 8))
-    ax = fig.add_subplot(211)
-    ax.errorbar(x_values,
+    axes = fig.add_subplot(211)
+    axes.errorbar(x_values,
                 y_values,
                 yerr=error_bars,
                 fmt=DATA_POINT_FORMAT,
                 label=LEGEND_LABELS[0]
                 )
-    ax.set_xlabel(X_LABEL)
-    ax.set_ylabel(Y_LABEL)
-    ax.grid(True)
-    ax.plot(time,
+    axes.set_xlabel(X_LABEL)
+    axes.set_ylabel(Y_LABEL)
+    axes.grid(True)
+    axes.plot(time,
             predicted_function(parameters, time),
             color=LINE_COLOR,
             linestyle=LINE_STYLE,
@@ -260,46 +260,53 @@ def data_point_plotter(data_array, predicted_function, parameters, time):
             )
 
     # Residuals
-    ax_residuals = fig.add_subplot(414)
+    residuals_axes = fig.add_subplot(414)
     residuals = y_values - predicted_function(parameters, x_values)
-    ax_residuals.errorbar(x_values,
+    residuals_axes.errorbar(x_values,
                           residuals,
                           yerr=error_bars,
                           fmt=DATA_POINT_FORMAT)
-    ax_residuals.plot(x_values,
+    residuals_axes.plot(x_values,
                       0 * x_values,
                       color=LINE_COLOR,
                       linestyle=LINE_STYLE)
-    ax_residuals.grid(True)
-    ax_residuals.set_title("Residuals", fontsize=14)
+    residuals_axes.grid(True)
+    residuals_axes.set_title("Residuals", fontsize=14)
 
-    ax.legend()
+    axes.legend()
     print(f"Saving figure as {PLOT_FILE_NAME} in local folder.")
     plt.savefig(PLOT_FILE_NAME, dpi=DPI)
     plt.show()
 
 
-def deviated_parameter_gen(parameter_list, function_list, data_array, sigma):
+def deviated_parameter_gen(parameter_list, function_list: list, data_array,
+                           sigma: int):
     """
-    Generates a list of parameters which produce a chi squared value which 
-    corresponds to a given deviation from the minimum chi squared value found.
-    It finds a list of values as it is not likely that a chi squared difference
+    Generates a list of parameters which produce a chi squared value which
+    corresponds to a given deviation from the minimum chi squared value found
+    for that error level. It is not likely that a parameter list produces a chi
+    squared value whose difference is exactly that which corresponds to the
+    sigma value, so a list of parameters whose values are within a tolerance
+    of the difference value are found and averaged.
+
 
     Parameters
     ----------
-    parameter_list : TYPE
-        DESCRIPTION.
-    function_list : TYPE
-        DESCRIPTION.
-    data_array : TYPE
-        DESCRIPTION.
-    sigma : TYPE
-        DESCRIPTION.
+    parameter_list : numpy array
+        A list of the full output of parameters generated during
+        the fitting.
+    function_list : list
+        List of functions available for this function to call.
+    data_array : numpy array
+        Numpy array of the data currently being worked with.
+    sigma : int
+        The sigma value for which errors are being found.
 
     Returns
     -------
-    deviated_parameters : TYPE
-        DESCRIPTION.
+    deviated_parameters : numpy array
+        Contains the list of parameters whose chi squared deviates sufficiently
+        from the minimum chi squared value.
 
     """
     chi_squared = function_list[0]
@@ -327,7 +334,27 @@ def deviated_parameter_gen(parameter_list, function_list, data_array, sigma):
     return deviated_parameters
 
 
-def error_list_gen(deviated_parameter_list, optimised_parameters, sigma):
+def error_list_gen(deviated_parameter_list, optimised_parameters, sigma: int):
+    """
+    Generates an error list if given a set of parameters which deviate from the
+    minimum chi squared value.
+
+    Parameters
+    ----------
+    deviated_parameter_list : numpy array
+        Contains the lists of the parameters whose chi squared value deviates
+        sufficiently from the minimum chi squared value.
+    optimised_parameters : numpy array
+        Array of the deviated parameters.
+    sigma : int
+        The sigma level for which the error list is being generated.
+
+    Returns
+    -------
+    error_list : numpy_array
+        Contains the errors on the parameters for that given sigma value.
+
+    """
     error_list = np.empty(0)
 
     if deviated_parameter_list.size == 0:
@@ -343,7 +370,27 @@ def error_list_gen(deviated_parameter_list, optimised_parameters, sigma):
 
 
 def error_list_combiner(sigma_1_error_list, sigma_2_error_list):
+    """
+    Combines the error lists for the two sigma values considered. It checks
+    if either list is empty, and proceeds accordingly. If both lists are empty,
+    it is likely because the tolerance on the sigma values was too low or the
+    intial guesses were very far off.
+
+    Parameters
+    ----------
+    sigma_1_error_list : numpy array
+        Contains a list of the 1 sigma errors.
+    sigma_2_error_list : numpy array
+        Contains a list of the 2 sigma errors.
+
+    Returns
+    -------
+    error_list : numpy array
+        Final combined error list.
+
+    """
     error_list = np.empty((0, 1))
+
 
     sigma_1_empty = sigma_1_error_list.size == 0
     sigma_2_empty = sigma_2_error_list.size == 0
@@ -368,7 +415,7 @@ def error_list_combiner(sigma_1_error_list, sigma_2_error_list):
 
 def optimiser(function_list, parameter_guess_list, data_array):
     """
-    Fits the curve recursively until the fit tolerance is met, while at the 
+    Fits the curve recursively until the fit tolerance is met, while at the
     same time filtering the data of any outliers by calling the data filtering
     function, and obtaining errors on the fit parameters by calling the error
     calculator function. Each time the program is called, it increments its
@@ -405,8 +452,13 @@ def optimiser(function_list, parameter_guess_list, data_array):
 
     # Calculate chi^2 and reduced chi^2 for this iteration
     chi = chi_squared(parameter_guess_list[0], data, predicted_function)
-    print(data.shape[0])
     chi_r = chi / (data.shape[0] - len(parameter_guess_list[0]))
+
+    if optimiser.counter > 499:
+        print("Maximum number of iterations reached! Giving up. Consider re-"
+              "evaluating intial guesses.")
+        return parameter_guess_list, data_array, chi, chi_r
+
     if chi_r > FIT_TOLERANCE:  # Calls function again if fit isn't good enough
         optimiser.counter += 1  # Iterate
 
@@ -414,7 +466,8 @@ def optimiser(function_list, parameter_guess_list, data_array):
                                         parameter_guess_list[0],
                                         args=(data, predicted_function),
                                         disp=False,
-                                        retall=True)  # Outputs every iteration
+                                        retall=True, # Outputs every iteration
+                                        )
 
         return optimiser(function_list=function_list,
                          parameter_guess_list=optimised_parameter_list,
@@ -424,14 +477,31 @@ def optimiser(function_list, parameter_guess_list, data_array):
 
 
 def significant_figure_rounder(value: float, significant_figures: int):
-    rounded_value = float('{:.{p}g}'.format(value, p=significant_figures))
+    """
+    Rounds a given value to a number of significant figures.
+
+    Parameters
+    ----------
+    value : float
+        Value being rounded.
+    significant_figures : int
+        Number of significant figures to which the value is rounded.
+
+    Returns
+    -------
+    rounded_value : float
+        The rounded value.
+
+    """
+
+    rounded_value = float(f'{value:.{significant_figures}g}')
 
     return rounded_value
 
 
 def decimal_place_counter(value: float):
     """
-    Counts the number of digits after the decimal point in a floating point 
+    Counts the number of digits after the decimal point in a floating point
     number.
 
     Parameters
@@ -449,20 +519,66 @@ def decimal_place_counter(value: float):
     return decimal_places
 
 
-def period_to_radius(period):
-    r = np.cbrt(period ** 2) # AU
+def period_to_radius(period: float):
+    """
+    Applies kepler's third law to get the radius of orbit in AU. Period should
+    be in years.
 
-    return r
+    Parameters
+    ----------
+    period : float
+        Period of the system's orbit.
+
+    Returns
+    -------
+    radius : float
+        Radius of the orbit in AU.
+
+    """
+    radius = np.cbrt(period ** 2) # AU
+
+    return radius
 
 
-def radius_to_planet_velocity(radius):
-    planet_velocity = np.sqrt((sciconst.G * STAR_MASS * const.GM_sun) / (
-        radius))
+def radius_to_planet_velocity(radius: float):
+    """
+    Calculates the planet velocity given a radius. Values are converted to
+    standard SI units.
+
+    Parameters
+    ----------
+    radius : float
+        Radius of orbit in AU.
+
+    Returns
+    -------
+    planet_velocity : float
+        Velocity of the planet in m/s.
+
+    """
+    planet_velocity = np.sqrt((G * STAR_MASS * M_SUN) / (radius * AU))
 
     return planet_velocity
 
 
 def planet_mass_calculator(star_velocity, planet_velocity):
+    """
+    Calculates the mass of the planet given a star velocity and a planet
+    velocity.
+
+    Parameters
+    ----------
+    star_velocity : float
+        Maximum velocity of the star.
+    planet_velocity : float
+        Velocity of the planet.
+
+    Returns
+    -------
+    planet_mass : float
+        Mass of the planet in Jovian units.
+
+    """
     planet_mass = (STAR_MASS * star_velocity)/planet_velocity
 
     return planet_mass
@@ -509,27 +625,28 @@ def main() -> None:
         error_on_parameters[i] = np.round(error_on_parameters[i],
                                           decimal_places)
 
-    velocity = optimised_parameters[0]
-    angular = optimised_parameters[1]
-    phase = optimised_parameters[2]
+    velocity = optimised_parameters[0] # m/s
+    angular = optimised_parameters[1] # rad / year
+    phase = optimised_parameters[2] # rad
+
     error_v = error_on_parameters[0]
     error_w = error_on_parameters[1]
     error_p = error_on_parameters[2]
 
-    print(f"Velocity: ({velocity} +/- {error_v}) m/s\n"
+    print(f"\nVelocity: ({velocity} +/- {error_v}) m/s\n"
           f"Angular velocity: ({angular} +/- {error_w}) rad/year\n"
           f"Phase: ({phase} +/- {error_p}) rad\n"
           f"Chi^2 = {chi:.3f}\n"
-          f"Reduced Chi^2 = {chi_r:.3f}")
+          f"Reduced Chi^2 = {chi_r:.3f}\n")
 
     period = 2*np.pi / angular
     radius = period_to_radius(period)
     planet_velocity = radius_to_planet_velocity(radius)
     planet_mass = planet_mass_calculator(velocity, planet_velocity)
 
-    print(f"Orbital radius = {radius}\n"
-          f"Planet velocity = {planet_velocity}m/s\n"
-          f"Planet mass = {planet_mass}M_s")
+    print(f"Orbital radius = {radius:.4g} AU\n"
+          f"Planet velocity = {planet_velocity:.4g} m/s\n"
+          f"Planet mass = {planet_mass:.4g} M_s")
 
 
     continuous_time = np.linspace(np.floor(data[0, 0]), np.ceil(data[-1, 0]),
