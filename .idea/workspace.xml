@@ -8,8 +8,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e9a2fe46-70b0-46c8-b975-6214b0c0a071" name="Changes" comment="finished errors">
+    <list default="true" id="e9a2fe46-70b0-46c8-b975-6214b0c0a071" name="Changes" comment="added functions for calculating">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/plot.png" beforeDir="false" afterPath="$PROJECT_DIR$/plot.png" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/w54780ds_doppler.py" beforeDir="false" afterPath="$PROJECT_DIR$/w54780ds_doppler.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -52,10 +53,16 @@
     &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/home/dominik/Documents/IntroToProgramming/assignment2&quot;,
     &quot;run.code.analysis.last.selected.profile&quot;: &quot;aDefault&quot;,
     &quot;settings.editor.selected.configurable&quot;: &quot;editor.preferences.fonts.default&quot;
   }
 }</component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$" />
+    </key>
+  </component>
   <component name="RunManager">
     <configuration name="w54780ds_doppler" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="assignment2" />
@@ -142,7 +149,15 @@
       <option name="project" value="LOCAL" />
       <updated>1712768284787</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="added functions for calculating">
+      <option name="closed" value="true" />
+      <created>1713175658198</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1713175658199</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
@@ -150,6 +165,7 @@
     <MESSAGE value="initial commit" />
     <MESSAGE value="Very messy code. Works." />
     <MESSAGE value="added TODO" />
-    <option name="LAST_COMMIT_MESSAGE" value="added TODO" />
+    <MESSAGE value="added functions for calculating" />
+    <option name="LAST_COMMIT_MESSAGE" value="added functions for calculating" />
   </component>
 </project>
