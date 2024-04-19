@@ -547,14 +547,14 @@ def data_point_plotter(data_array, predicted_function, parameters, time,
                                                                  'points',
                   fontsize='10')
     axes.annotate((rf'$v_0 = ({display_values[0]} \pm {display_values[7]})'
-                   r'\text{m s}^{-1}$'),
+                   r'\mathrm{m s}^{-1}$'),
                   (0, 0),
                   (-60, -75),
                   xycoords='axes fraction', va='top',
                   textcoords='offset points', fontsize='10')
     axes.annotate((rf'$\omega = ({display_values[1]} \pm'
                    rf'{display_values[8]})'
-                   r'\text{rad s}^{-1}$'), (0, 0),
+                   r'\mathrm{rad s}^{-1}$'), (0, 0),
                   (-60, -95),
                   xycoords='axes fraction', va='top',
                   textcoords='offset points', fontsize='10')
