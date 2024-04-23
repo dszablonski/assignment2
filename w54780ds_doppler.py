@@ -750,6 +750,5 @@ def main() -> None:
                        continuous_time, display_list)
 
 
-
 if __name__ == '__main__':
     main()
