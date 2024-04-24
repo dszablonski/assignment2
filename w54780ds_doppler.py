@@ -11,14 +11,14 @@ and outliers.
 
 The script filters through a given list of data files, the data from which
 is transferred to a numpy array to be worked with. Once any invalid rows and
-extreme outliers are removed, program guesses initial paramters by cursory
+extreme outliers are removed, program guesses initial parameters by cursory
 analysis of the data. The fit is optimised by running recursively until the
 goal chi squared value is reached, or the maximum number of recursions is
 reached.
 
-The chi squared minimisation is achieved through the use of the scipy
-"minimize" function. Standard error on parameters can be calculated from the
-inverse Hessian matrix, as according to the algorithm described here:
+The scipy "minimize" function performs chi squared minimisation. Standard
+error on parameters can be calculated from the inverse Hessian matrix,
+as according to the algorithm described here:
 https://search.r-project.org/CRAN/refmans/HelpersMG/html/SEfromHessian.html
 The Hessian matrix can be simply obtained through the scipy minimize function.
 
@@ -27,11 +27,12 @@ fitted parameters. The program plots the data points along with the fitted
 curve, while also showing a plot of residuals. The fitted parameters and
 calculated values are also displayed on the plot.
 
+The most time-intensive aspect of this code is saving and showing the generated
+figure.
+
 Last Updated: 23/04/2024
 @author: Dominik Szablonski, UID: 11310146
 """
-
-from math import isclose
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -86,7 +87,7 @@ def data_getter():
 
     Returns
     -------
-    array : array like
+    array : array_like
         Array containing data extracted from file list.
 
     Raises
@@ -102,7 +103,9 @@ def data_getter():
                                                   dtype=float,
                                                   delimiter=DELIMITER,
                                                   skip_header=SKIP_HEADER,
-                                                  comments=COMMENTS)))
+                                                  comments=COMMENTS,
+                                                  autostrip=True
+                                                  )))
             print(f"File {file_name} processed.")
         except FileNotFoundError:
             print(f"File {file_name} not found in local path. Skipping.")
@@ -121,7 +124,7 @@ def initial_data_filtering(data_array):
     0-error values.
 
     Extreme outliers are identified by comparing their absolute difference
-    with the range of the 15th and 85th percentile of the datadata. This works
+    with the range of the 15th and 85th percentile of the data. This works
     as the "regular" shifted wavelengths fluctuate about the emitted wavelength
     within this range.
 
@@ -129,12 +132,12 @@ def initial_data_filtering(data_array):
 
     Parameters
     ----------
-    data_array : array like
+    data_array : array_like
         Data which is going to be filtered.
 
     Returns
     -------
-    data_array : array like
+    data_array : array_like
         Filtered data.
 
     """
@@ -145,17 +148,18 @@ def initial_data_filtering(data_array):
     print(f"{number_of_nans} NaN values will be removed.")
     data_array = data_array[~np.isnan(data_array).any(axis=1), :]
 
-    # Removes extreme outliers.
-    iq = iqr(data_array[:, 1], rng=(15, 85))
-    outlier_condition = np.abs(data_array[:, 1] - EMITTED_WAVELENGTH) > iq
-    number_of_outliers = data_array[np.where(outlier_condition)].size
-    print(f"{number_of_outliers} extreme outlier(s) will be removed.")
-    data_array = np.delete(data_array, np.where(outlier_condition), 0)
-
     # Removes rows with error = 0
     number_of_zero_error = len(data_array[np.where(data_array[:, 2] == 0)])
     print(f"{number_of_zero_error} row(s) with zero error will be removed.")
     data_array = np.delete(data_array, np.where(data_array[:, 2] == 0), 0)
+
+    # Removes extreme outliers.
+    per_range = iqr(data_array[:, 1], rng=(15, 85))
+    outlier_condition = (np.abs(data_array[:, 1] - EMITTED_WAVELENGTH) >
+                         per_range)
+    number_of_outliers = data_array[np.where(outlier_condition)].size
+    print(f"{number_of_outliers} extreme outlier(s) will be removed.")
+    data_array = np.delete(data_array, np.where(outlier_condition), 0)
 
     return data_array
 
@@ -167,21 +171,21 @@ def wavelength_function(parameters: list, time):
 
     Parameters
     ----------
-    parameters : array like
+    parameters : array_like
         Parameter values.
-    time : array likes
+    time : array_like
         Time values for which values of the function are calculated.
 
     Returns
     -------
-    wavelength : array like
+    wavelength : array_like
         Wavelength values corresponding to each time value in the 'time'
         parameter.
 
     """
     wavelength = ((1 + (parameters[0] / c) * np.sin(
         parameters[1] * time + parameters[2]) * INCLINATION_FACTOR) *
-        EMITTED_WAVELENGTH)
+                  EMITTED_WAVELENGTH)
 
     return wavelength
 
@@ -193,9 +197,9 @@ def chi_squared_func(parameters, data_array, function):
 
     Parameters
     ----------
-    parameters : array like
+    parameters : array_like
         Function parameters.
-    data_array : array like
+    data_array : array_like
         Data points being considered.
     function : function
         The function which is compared to the data.
@@ -224,19 +228,19 @@ def data_filterer(data_array, parameters, predicted_function,
 
     Parameters
     ----------
-    data_array : array like
+    data_array : array_like
         Data being filtered.
-    parameters : array like
+    parameters : array_like
         The fitted parameters.
     predicted_function : function
-        The function the data is being fitted to.
+        The curve data is being fitted to.
     z_threshold : float, optional
         The Z score threshold for which outliers are identified. The default is
         Z_SCORE_THRESHOLD
 
     Returns
     -------
-    data_array : array like
+    data_array : array_like
         Filtered data.
 
     """
@@ -261,24 +265,24 @@ def optimiser(function_list, data_array, hess_matrix=None,
 
     Parameters
     ----------
-    function_list : array like
+    function_list : array_like
         Contains functions used by the optimiser.
-    data_array : array like
+    data_array : array_like
         The data being fitted.
-    hess_matrix : array like, optional
+    hess_matrix : array_like, optional
         A matrix generated by the minimize function from which the standard
         error on the fitted parameters can be found. The default is None.
-    parameter_guess_list : array like, optional
+    parameter_guess_list : array_like, optional
         A list of the fitted parameters. The default is None.
 
     Returns
     -------
-    parameter_guess_list : array like
+    parameter_guess_list : array_like
         List of fully optimised, fitted parameters.
-    data_array : array like
+    data_array : array_like
         Contains the fitted data which has been further filtered by the
         optimisation process.
-    hess_matrix : array like
+    hess_matrix : array_like
         Inverse of the Hessian matrix which will be used to find the standard
         error on the fitted parameters.
 
@@ -294,7 +298,6 @@ def optimiser(function_list, data_array, hess_matrix=None,
     # Calculate chi^2 and reduced chi^2 for this iteration
     chi = chi_squared(parameter_guess_list, data_array, predicted_function)
     chi_r = chi / (data_array.shape[0] - len(parameter_guess_list))
-    print(chi_r)
     print(f"Chi^2 = {chi:.3f}")
     print(f"Reduced chi^2 = {chi_r:.3f}")
 
@@ -304,13 +307,13 @@ def optimiser(function_list, data_array, hess_matrix=None,
         return parameter_guess_list, data_array, hess_matrix
 
     # Calls function again if fit isn't good enough.
-    if not isclose(chi_r, 1, abs_tol=CHI_TOLERANCE) and chi_r > 1:
-        minimisation_ouput = minimize(chi_squared, parameter_guess_list,
-                                      args=(data_array, predicted_function))
+    if not np.isclose(chi_r, 1, atol=CHI_TOLERANCE) and chi_r > 1:
+        minimisation_output = minimize(chi_squared, parameter_guess_list,
+                                       args=(data_array, predicted_function))
 
-        optimised_parameter_list = minimisation_ouput.x
-        
-        hess_inv_matrix = minimisation_ouput.hess_inv
+        optimised_parameter_list = minimisation_output.x
+
+        hess_inv_matrix = minimisation_output.hess_inv
 
         data = data_filter(data_array, optimised_parameter_list,
                            predicted_function)
@@ -353,7 +356,7 @@ def significant_figure_rounder(value: float,
         return rounded_value
 
     if before_decimal > significant_figures:
-        rounded_value = f'{value:.{significant_figures}g}'
+        rounded_value = f'{value:{significant_figures}g}'
         return rounded_value
 
     decimal_places = significant_figures - before_decimal
@@ -362,30 +365,8 @@ def significant_figure_rounder(value: float,
     return rounded_value
 
 
-def decimal_place_counter(value):
-    """
-    Counts the number of digits after the decimal point in a floating point
-    number. The argument must be a string or have must be able to be converted
-    to a string.
-
-    Parameters
-    ----------
-    value : string
-        The value whose digits are being counted.
-
-    Returns
-    -------
-    decimal_places : int
-        The number of digits after the decimal place.
-
-    """
-    decimal_places = str(value)[::-1].find('.')
-
-    return decimal_places
-
-
-def error_propogator(value_list, error_list,
-                     function_output: float, constant=1.0, power=1.0):
+def propagator(value_list, error_list,
+               function_output: float, constant=1.0, power=1.0):
     """
     Performs standard error propagation. Only considers cases where there is
     multiplication between values, a value is raised to a power, and/or is
@@ -394,9 +375,9 @@ def error_propogator(value_list, error_list,
 
     Parameters
     ----------
-    value_list : array like
+    value_list : array_like
         A list of values with errors on them.
-    error_list : array like
+    error_list : array_like
         A list of errors corresponding to each value.
     function_output : float, optional
         Value of the function for which the error is being propagated.
@@ -429,7 +410,7 @@ def error_propogator(value_list, error_list,
     return final_error
 
 
-def data_point_plotter(data_array, predicted_function, parameters, time,
+def data_point_plotter(data_array, predicted_function, parameters,
                        display_values) -> None:
     """
     Function to plot the data and the curve which was fitted to the data.
@@ -440,10 +421,8 @@ def data_point_plotter(data_array, predicted_function, parameters, time,
         Array of the data to which the curve was fitted.
     predicted_function : function
         The curve which was fitted to the data.
-    parameters : list
+    parameters : array_like
         List of function parameters.
-    time : numpy array
-        A numpy array containing the times for which the curve will be plotted.
     display_values : numpy array
         Contains strings of values which will be printed on the plot.
 
@@ -457,6 +436,8 @@ def data_point_plotter(data_array, predicted_function, parameters, time,
     y_values = data_array[:, 1]
     error_bars = data_array[:, 2]
 
+    time = np.linspace(np.min(x_values), np.max(x_values), data_array.size)
+    
     # Main plot
     fig = plt.figure(figsize=(8, 8))
     plt.style.use(PLOT_STYLE)
@@ -479,27 +460,13 @@ def data_point_plotter(data_array, predicted_function, parameters, time,
                    label=LEGEND_LABELS[1]
                    )
 
-    chi = display_values[5]
     degrees_of_freedom = data_array.shape[0] - parameters.size
-    reduced_chi = display_values[6]
-
-    velocity = display_values[0]
-    angular_velocity = display_values[1]
-    phase = display_values[2]
-    radius = display_values[3]
-    planet_mass = display_values[4]
-
-    velocity_error = display_values[7]
-    angular_velocity_error = display_values[8]
-    phase_error = display_values[9]
-    radius_error = display_values[10]
-    planet_mass_error = display_values[11]
 
     main_axes.annotate('Fit data',
                        (1, 0), (-40, -35),
                        xycoords='axes fraction', textcoords='offset points',
                        va='top', fontsize='10')
-    main_axes.annotate(rf'$\chi^2 = {chi}$',
+    main_axes.annotate(rf'$\chi^2 = {display_values[0][0]}$',
                        (1, 0), (-60, -55),
                        xycoords='axes fraction', textcoords='offset points',
                        va='top', fontsize='10')
@@ -507,7 +474,7 @@ def data_point_plotter(data_array, predicted_function, parameters, time,
                        (1, 0), (-132, -75),
                        xycoords='axes fraction', textcoords='offset points',
                        va='top', fontsize='10')
-    main_axes.annotate(rf'Reduced $\chi^2 = {reduced_chi}$',
+    main_axes.annotate(rf'Reduced $\chi^2 = {display_values[0][1]}$',
                        (1, 0), (-104, -95),  #
                        xycoords='axes fraction', textcoords='offset points',
                        va='top', fontsize='10')
@@ -521,20 +488,20 @@ def data_point_plotter(data_array, predicted_function, parameters, time,
                        (0, 0), (-60, -55),
                        xycoords='axes fraction', textcoords='offset points',
                        va='top', fontsize='10')
-    main_axes.annotate((rf'$v_0 = ({velocity} \pm {velocity_error})'
+    main_axes.annotate((rf'$v_0 = ({display_values[1][0]} \pm'
+                        rf'{display_values[1][1]})'
                         r'\mathrm{m s}^{-1}$'),
-                       (0, 0),
-                       (-60, -75),
+                       (0, 0), (-60, -75),
                        xycoords='axes fraction', va='top',
                        textcoords='offset points', fontsize='10')
-    main_axes.annotate((rf'$\omega = ({angular_velocity} \pm'
-                        rf'{angular_velocity_error}$)'
+    main_axes.annotate((rf'$\omega = ({display_values[2][0]} \pm'
+                        rf'{display_values[2][1]}$)'
                         r'rad year$^{-1}$'),
                        (0, 0), (-60, -95),
                        xycoords='axes fraction', textcoords='offset points',
                        va='top', fontsize='10')
-    main_axes.annotate((rf'$\phi = ({phase} \pm'
-                        rf'{phase_error})$rad'),
+    main_axes.annotate((rf'$\phi = ({display_values[3][0]} \pm'
+                        rf'{display_values[3][1]})$rad'),
                        (0, 0), (-60, -115),
                        xycoords='axes fraction', textcoords='offset points',
                        va='top', fontsize='10')
@@ -543,15 +510,17 @@ def data_point_plotter(data_array, predicted_function, parameters, time,
                        (0.5, 0), (-60, -35),
                        xycoords='axes fraction', textcoords='offset points',
                        va='top', fontsize='10')
-    main_axes.annotate(rf'$r = ({radius} \pm {radius_error})$AU',
+    main_axes.annotate(rf'$r = ({display_values[4][0]} \pm'
+                       rf'{display_values[4][1]})$AU',
                        (0.5, 0), (-60, -55),
                        xycoords='axes fraction', textcoords='offset points',
                        va='top', fontsize='10')
-    main_axes.annotate(rf'$m_p = ({planet_mass} \pm {planet_mass_error})m_J$',
+    main_axes.annotate(rf'$m_p = ({display_values[5][0]} \pm'
+                       rf'{display_values[5][1]})m_J$',
                        (0.5, 0), (-60, -75),
                        xycoords='axes fraction', textcoords='offset points',
                        va='top', fontsize='10')
-
+    
     # Residuals
     residuals_axes = fig.add_subplot(414)
     residuals = y_values - predicted_function(parameters, x_values)
@@ -568,10 +537,11 @@ def data_point_plotter(data_array, predicted_function, parameters, time,
     residuals_axes.set_title("Residuals", fontsize=14)
     residuals_axes.set_xlabel(X_LABEL)
     residuals_axes.set_ylabel("Standardised Residual")
+    
 
     main_axes.legend()
-    print(f"Saving figure as {PLOT_FILE_NAME} in local folder.")
     plt.savefig(PLOT_FILE_NAME, dpi=DPI)
+    
     plt.show()
 
 
@@ -579,77 +549,140 @@ def guesser(data, function):
     """
     Function to generate initial estimates for fitted parameters.
 
-    A guess for velocity was made by rearranging the fitted equation for when
+    A guess for velocity is made by rearranging the fitted equation for when
     the peak doppler shift is observed,
 
         v_0 = ((lambda_max/lambda_0) - 1)*(c/sin(inclination angle)).
 
-    An estimate for the period is found by finding times where the observed
+    An estimate for the period is found by finding times when the observed
     wavelength is close to the emitted wavelength, i.e, times when,
 
         sin(omega t + phi) = 0.
 
     The difference betweens these times results in obtaining a half-period,
-    which can be used to calculate an esitmate angular velocity. This works
-    even when more than 1 cycle of oscilation is observed as the differences
+    which can be used to calculate an estimate angular velocity. This works
+    even when more than 1 cycle of oscillation is observed as the differences
     are averaged.
 
     An estimate for the phase is found by generating time values of a
     "pure sin" wave, i.e., with the function with 0 phase difference. The time
     of maximum amplitude of this wave is then subtracted from the time of the
-    maximum value of the data (delta t), and the estiated phase difference is
+    maximum value of the data (delta t), and the estimated phase difference is
     found by,
 
         phi = (2 * pi * delta t) / period.
 
     Parameters
     ----------
-    data : array like
+    data : array_like
         Contains data being fitted.
     function : function
         Curve to which the data will be fitted.
 
     Returns
     -------
-    guess_list : array like
+    guess_list : array_like
         Initial parameter guesses.
 
     """
     # Velocity estimate
-    velocity_guess = ((np.max(data[:,1])/EMITTED_WAVELENGTH)
-                      - 1)*(c / INCLINATION_FACTOR)
+    velocity_guess = ((np.max(data[:, 1]) / EMITTED_WAVELENGTH)
+                      - 1) * (c / INCLINATION_FACTOR)
 
     # Angular velocity estimate
     central_times = data[np.where(np.isclose(EMITTED_WAVELENGTH,
-                                             data[:,1], rtol=1e-9)), 0]
+                                             data[:, 1], rtol=1e-9)), 0]
     half_period = np.average(np.diff(central_times))
     angular_velocity_guess = np.pi / half_period
 
     # Phase estimate
-    pure_sin = function([velocity_guess, angular_velocity_guess, 0], data[:,0])
-    pure_max_time = data[np.where(np.isclose(np.max(data[:,1]), pure_sin,
+    pure_sin = function([velocity_guess, angular_velocity_guess, 0],
+                        data[:, 0])
+    pure_max_time = data[np.where(np.isclose(np.max(data[:, 1]), pure_sin,
                                              rtol=1e-9)), 0]
-    time_diff = np.abs(pure_max_time - data[np.where(data[:,1]
-                                                     == np.max(data[:,1])), 0])
-    phase_guess = ((np.pi * time_diff)/half_period)[0][0]
+    time_diff = np.abs(pure_max_time - data[np.where(data[:, 1] == np.max(
+        data[:, 1])), 0])
+    phase_guess = ((np.pi * time_diff) / half_period)[0][0]
 
     guess_list = [velocity_guess, angular_velocity_guess, phase_guess]
 
     return guess_list
 
 
-def main() -> None:
+def display_list_gen(value_list, error_list, rounding_function):
     """
-    Main function. Calls all other functions and prints main output.
+    Rounds and converts fitted and calculated values to strings so that they
+    may be displayed to the user in the terminal and on the plot. The order
+    of values in value_list must match the order of errors in error_list.
+
+    Parameters
+    ----------
+    value_list : array_like
+        List of values (fitted and calculated).
+    error_list : array_like
+        List of errors corresponding to each value.
+    rounding_function : function
+        Required function to round
+
+    :param value_list:
+    :param error_list:
+    :param rounding_function:
+    :return:
+    """
+    display_list = np.empty((0, 2))
+
+    for error, value in zip(error_list, value_list):
+        rounded_value = rounding_function(value)
+        decimal_places = str(rounded_value)[::-1].find(".")
+        rounded_error = f'{error:.{decimal_places}f}'
+        display_list = np.append(display_list,
+                                 [[rounded_value, rounded_error]], axis=0)
+
+    return display_list
+
+
+def displayer(display_list) -> None:
+    """
+    Prints output to terminal.
+
+    Parameters
+    ----------
+    display_list : array_like
+        List of values which were calculated and are now displayed to the user.
 
     Returns
     -------
     None
     """
-    data = data_getter() #
+    print(f"\nBelow values found after {optimiser.counter} iterations.\n"
+          f""
+          f"Chi^2 = {display_list[0][0]}\n"
+          f""
+          f"Reduced Chi^2 = {display_list[0][0]}"
+          f"\n"
+          f"\nVelocity: ({display_list[1][0]} +/- {display_list[1][1]}) m/s\n"
+          f""
+          f"Angular velocity: ({display_list[2][0]} +/- "
+          f"{display_list[2][1]}) rad/year\n"
+          f""
+          f"Phase: ({display_list[3][0]} +/- {display_list[3][1]}) rad\n"
+          f"\n"
+          f"Orbital radius=({display_list[4][0]} + /- "
+          f"{display_list[4][1]}) AU\n"
+          f""
+          f"Planet mass=({display_list[5][0]} + /- {display_list[5][1]}) M_jup"
+          )
 
-    # Intially
-    data = initial_data_filtering(data)
+
+def main() -> None:
+    """
+    Main function. Calls all other functions.
+
+    Returns
+    -------
+    None
+    """
+    data = initial_data_filtering(data_getter())  # Retrieves and filters data
 
     optimiser.counter = 1  # initialise counter
 
@@ -669,86 +702,48 @@ def main() -> None:
     # Standard errors on parameters found as described in the header.
     error_on_parameters = np.sqrt(np.diag(hessian_matrix))
 
-    # Fitted parameters
+    # Fitted parameters. Assigned to variables for calculation.
     velocity = optimised_parameters_list[0]  # m/s
     angular = optimised_parameters_list[1]  # rad / year
-    phase = optimised_parameters_list[2]  # rad
 
-    # Errors on fitted parameters
+    # Errors on fitted parameters. Assigned to variables for calculation.
     error_v = error_on_parameters[0]
     error_w = error_on_parameters[1]
-    error_p = error_on_parameters[2]
 
     # Calculated values
     period = 2 * np.pi / angular
-    period_error = error_propogator([angular], [error_w], period)
+    period_error = propagator([angular], [error_w], period)
 
     radius = np.cbrt(period ** 2)
-    radius_error = error_propogator([period], [period_error], radius, (3 / 2))
+    radius_error = propagator([period], [period_error], radius, (3 / 2))
 
     # Not displayed, only needed for further calculation.
     planet_velocity = np.sqrt((G * STAR_MASS * M_SUN) / (radius * AU))
-    planet_v_error = error_propogator([radius], [radius_error],
-                                      planet_velocity, power=(1 / 2),
-                                      constant=np.sqrt(G * STAR_MASS))
+    planet_v_error = propagator([radius], [radius_error],
+                                planet_velocity, power=(1 / 2),
+                                constant=np.sqrt(G * STAR_MASS))
 
     planet_mass = ((STAR_MASS * M_SUN * velocity) / planet_velocity) / M_JUP
-    planet_mass_error = error_propogator([planet_velocity, velocity],
-                                         [planet_v_error, error_v],
-                                         planet_mass, constant=STAR_MASS)
+    planet_mass_error = propagator([planet_velocity, velocity],
+                                   [planet_v_error, error_v],
+                                   planet_mass, constant=STAR_MASS)
 
-    radius_error = np.round(radius_error, decimal_place_counter(radius))
-    planet_mass_error = np.round(planet_mass_error,
-                                 decimal_place_counter(planet_mass))
+    value_list = np.append(optimised_parameters_list, (planet_mass, radius))
+    error_list = np.append(error_on_parameters,
+                           (planet_mass_error, radius_error))
 
-    display_list = np.empty(0)
-
-    # Rounds all values to appropriate number of significant figures. Stored
-    # as strings to preserve end zeros.
-    velocity = significant_figure_rounder(velocity)
-    angular = significant_figure_rounder(angular)
-    phase = significant_figure_rounder(phase)
-    planet_mass = significant_figure_rounder(planet_mass)
-    radius = significant_figure_rounder(radius)
-
-    # Creates a list of all displayed values to be passed through to the
-    # plotting function
+    display_list = np.array([[f'{chi:.3f}', f'{reduced_chi:.3f}']])
     display_list = np.append(display_list,
-                             (velocity, angular, phase, radius, planet_mass,
-                              f'{chi:.3f}', f'{reduced_chi:.3f}',
-                              f'{error_v:.{decimal_place_counter(velocity)}f}',
-                              f'{error_w:.{decimal_place_counter(angular)}f}',
-                              f'{error_p:.{decimal_place_counter(phase)}f}',
-                              f'{radius_error:.{decimal_place_counter(radius)}f}',
-                              f'{planet_mass_error:.{decimal_place_counter(planet_mass)}f}'))
+                             display_list_gen(value_list, error_list,
+                                              significant_figure_rounder),
+                             axis=0)
 
-    print(f"\nBelow values found after {optimiser.counter} iterations.\n"
-          f""
-          f"Chi^2 = {chi:.3f}\n"
-          f""
-          f"Reduced Chi^2 = {reduced_chi:.3f}"
-          f"\n"
-          f"\nVelocity: ({velocity} +/- "
-          f"{error_v:.{decimal_place_counter(velocity)}f}) m/s\n"
-          f""
-          f"Angular velocity: ({angular} +/- "
-          f"{error_w:.{decimal_place_counter(angular)}f}) rad/year\n"
-          f""
-          f"Phase: ({phase} +/- "
-          f"{error_p:.{decimal_place_counter(phase)}f}) rad\n"
-          f"\n"
-          f"Orbital radius=({radius} + /- "
-          f"{radius_error:.{decimal_place_counter(radius)}f}) AU\n"
-          f""
-          f"Planet mass=({planet_mass} + /- "
-          f"{planet_mass_error:.{decimal_place_counter(planet_mass)}f}) M_jup")
-
-    continuous_time = np.linspace(np.floor(data[0, 0]), np.ceil(data[-1, 0]),
-                                  num=data.size)
-
+    displayer(display_list)
+    
     data_point_plotter(data, wavelength_function, optimised_parameters_list,
-                       continuous_time, display_list)
+                       display_list)
 
 
 if __name__ == '__main__':
     main()
+    
