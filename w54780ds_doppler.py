@@ -34,7 +34,7 @@ calculated values are also displayed on the plot.
 The most time-intensive aspect of this code is saving and showing the generated
 figure.
 
-Last Updated: 26/04/2024
+Last Updated: 27/04/2024
 @author: Dominik Szablonski, UID: 11310146
 """
 
@@ -88,6 +88,20 @@ TARGET_REDUCED_CHI_SQUARED = 1
 MAXIMUM_ITERATIONS = 10
 CHI_TOLERANCE = 0.1
 SIGNIFICANT_FIGURES = 4
+TITLE = r"""
+██████╗  ██████╗ ██████╗ ██████╗ ██╗     ███████╗██████╗
+██╔══██╗██╔═══██╗██╔══██╗██╔══██╗██║     ██╔════╝██╔══██╗
+██║  ██║██║   ██║██████╔╝██████╔╝██║     █████╗  ██████╔╝
+██║  ██║██║   ██║██╔═══╝ ██╔═══╝ ██║     ██╔══╝  ██╔══██╗
+██████╔╝╚██████╔╝██║     ██║     ███████╗███████╗██║  ██║
+╚═════╝  ╚═════╝ ╚═╝     ╚═╝     ╚══════╝╚══════╝╚═╝  ╚═╝
+███████╗██╗  ██╗██╗███████╗████████╗███████╗
+██╔════╝██║  ██║██║██╔════╝╚══██╔══╝██╔════╝
+███████╗███████║██║█████╗     ██║   ███████╗
+╚════██║██╔══██║██║██╔══╝     ██║   ╚════██║
+███████║██║  ██║██║██║        ██║   ███████║
+╚══════╝╚═╝  ╚═╝╚═╝╚═╝        ╚═╝   ╚══════╝
+"""
 
 
 def data_getter():
@@ -104,7 +118,7 @@ def data_getter():
     FileNotFoundError
     SystemExit
     """
-    print("Fetching data...")
+    print("\nFetching data...")
     data_array = np.empty((0, 3))
     for file_name in FILE_LIST:
         try:
@@ -116,12 +130,12 @@ def data_getter():
                                                   comments=COMMENTS,
                                                   autostrip=True
                                                   )))
-            print(f"File {file_name} processed.")
+            print(fr"File {file_name} processed.     ※\(^o^)/※")
         except FileNotFoundError:
-            print(f"File {file_name} not found in local path. Skipping.")
+            print(f"File {file_name} not found in local path. Skipping. (ಠ_ಠ)")
 
     if data_array[:].size == 0:
-        raise SystemExit('No data points added. Quitting.')
+        raise SystemExit('No data points added. Quitting. (ノಠ益ಠ)ノ彡┻━┻')
 
     print(f"{len(data_array[:])} data points added.")
 
@@ -323,21 +337,23 @@ def optimiser(function_list, data_array, covariant_matrix=None,
 
     # Calls function again if fit isn't good enough.
     if not np.isclose(chi_r, 1, atol=CHI_TOLERANCE):
-        optimised_parameter_list, generated_covariant_matrix = curve_fit(
-            f=predicted_function,
-            xdata=data_array[:, 0],
-            ydata=data_array[:, 1],
-            sigma=data_array[:, 2],
-            p0=parameter_guess_list,
-            full_output=False)
+        output = curve_fit(predicted_function,
+                           data_array[:, 0],
+                           data_array[:, 1],
+                           p0=parameter_guess_list,
+                           sigma=data_array[:, 2]
+                           )
 
-        data = data_filter(data_array, optimised_parameter_list,
+        optimised_parameters = output[0]
+        generated_covariant_matrix = output[1]
+
+        data = data_filter(data_array, output[0],
                            predicted_function)
 
         counter += 1  # Iterate
 
         return optimiser(function_list=function_list,
-                         parameter_guess_list=optimised_parameter_list,
+                         parameter_guess_list=optimised_parameters,
                          data_array=data,
                          covariant_matrix=generated_covariant_matrix,
                          counter=counter)
@@ -418,7 +434,8 @@ def propagator(value_list, error_list, function_output, constant=1.0,
     error_list = np.array(error_list)
 
     if value_list.size != error_list.size:
-        raise SystemExit("Fatal error! Mismatched error and value size.")
+        raise SystemExit("Fatal error! Mismatched error and value size. "
+                         "(ノಠ益ಠ)ノ彡┻━┻")
 
     combined = np.sqrt(np.sum((error_list / value_list) ** 2))
 
@@ -558,6 +575,7 @@ def data_point_plotter(data_array, predicted_function, parameters,
     residuals_axes.set_ylabel("Standardised Residual")
 
     main_axes.legend()
+    print(f"Saving figure as {PLOT_FILE_NAME} in local folder.")
     plt.savefig(PLOT_FILE_NAME, dpi=DPI)
 
     plt.show()
@@ -664,7 +682,7 @@ def display_list_gen(value_list, error_list, rounding_function):
         decimal_places = str(rounded_value)[::-1].find(".")
         try:
             rounded_error = f'{error:.{decimal_places}f}'
-        except ValueError: # numbers before decimal in value > significant figs
+        except ValueError:  # numbers before decimal in value > significant figs
             rounded_error = f'{error:4g}'
         display_list = np.append(display_list,
                                  [[rounded_value, rounded_error]],
@@ -686,25 +704,29 @@ def displayer(display_list):
     -------
     None
     """
-    print(f"Fit data\n"
-          f"--------\n"
-          f"Chi^2 = {display_list[0][0]}\n"
-          f"Reduced Chi^2 = {display_list[0][1]}"
-          f"\n"
-          f"\nFitted parameters\n"
-          f"-----------------\n"
-          f"Velocity: ({display_list[1][0]} +/- {display_list[1][1]}) m/s\n"
-          f"Angular velocity: ({display_list[2][0]} +/- "
-          f"{display_list[2][1]}) rad/year\n"
-          f"Phase: ({display_list[3][0]} +/- {display_list[3][1]}) rad\n"
-          f"\n"
-          f"Calculated Values\n"
-          f"-----------------\n"
-          f"Orbital radius=({display_list[4][0]} + /- "
-          f"{display_list[4][1]}) AU\n"
-          f""
-          f"Planet mass=({display_list[5][0]} + /- {display_list[5][1]}) M_jup"
-          )
+
+    message = f"""    ------------
+    | Fit data |
+    ------------
+    Chi^2 = {display_list[0][0]}
+    Reduced Chi^2 = {display_list[0][1]}
+
+    ---------------------
+    | Fitted parameters |
+    ---------------------
+    Velocity: ({display_list[1][0]} +/- {display_list[1][1]}) m/s
+    Angular velocity: ({display_list[2][0]} +/-  {display_list[2][1]}) rad/year
+    Phase: ({display_list[3][0]} +/- {display_list[3][1]}) rad
+
+    ---------------------
+    | Calculated Values |
+    ---------------------
+    Orbital radius=({display_list[4][0]} + /-  {display_list[4][1]}) AU
+    Planet mass=({display_list[5][0]} + /- {display_list[5][1]}) M_jup
+    """
+
+    print(message)
+
 
 
 def value_calculator(parameter_list, error_list, error_propagator):
@@ -808,9 +830,6 @@ def main():
 
 
 if __name__ == '__main__':
-    print("|---------------------------------------------------|")
-    print("|    ☆ﾟ. * ･ ｡ﾟ    Doppler Shifts    ☆ﾟ. * ･ ｡ﾟ     |")
-    print("|           Dominik Szablonski - 11310146           |")
-    print("|---------------------------------------------------|")
-
+    print(TITLE)
+    input("Press enter to start >")
     main()
