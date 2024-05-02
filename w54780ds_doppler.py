@@ -34,7 +34,7 @@ calculated values are also displayed on the plot.
 The most time-intensive aspect of this program is saving and showing the
 generated figure.
 
-Last Updated: 27/04/2024
+Last Updated: 30/04/2024
 @author: Dominik Szablonski, UID: 11310146
 """
 
@@ -160,7 +160,7 @@ def initial_data_filtering(data_array, outlier_range=OUTLIER_RANGE):
     data_array : array_like
         Data which is going to be filtered.
     outlier_range : tuple
-        The percentile range outside of which outliers are identified.
+        The percentile range outside which outliers are identified.
 
     Returns
     -------
@@ -240,7 +240,7 @@ def chi_squared_func(parameters, data_array, function):
     y_vals = data_array[:, 1]
     time = data_array[:, 0]
     errors = data_array[:, 2]
-    velocity, angular, phase = parameters[0], parameters[1], parameters[2]
+    velocity, angular, phase = parameters
 
     chi_squared = np.sum(np.divide((y_vals - function(time, velocity,
                                                       angular, phase)),
@@ -512,20 +512,21 @@ def value_calculator(parameter_list, error_list, error_propagator):
     angular_velocity_error = error_list[1]
 
     # Calculated values
-    period = 2 * np.pi / angular_velocity
+    period = 2 * np.pi / angular_velocity # years
     period_error = error_propagator([angular_velocity],
                                     [angular_velocity_error], period)
 
-    radius = np.cbrt(period ** 2)
+    radius = (np.cbrt(((G * STAR_MASS * M_SUN)/(4*np.pi**2)
+                     )*(period * 365*24*3600)**2)/AU) # AU
     radius_error = error_propagator([period], [period_error], radius,
                                     power=2 / 3)
 
-    planet_velocity = np.sqrt((G * STAR_MASS * M_SUN) / (radius * AU))
+    planet_velocity = np.sqrt((G * STAR_MASS * M_SUN) / (radius * AU)) # m/s
     planet_velocity_error = error_propagator([radius], [radius_error],
                                              planet_velocity, power=1 / 2)
 
     planet_mass = (((STAR_MASS * M_SUN * velocity) / planet_velocity)
-                   / M_JUP)
+                   / M_JUP) # Jovian masses
     planet_mass_error = error_propagator([planet_velocity, velocity],
                                          [planet_velocity_error,
                                           velocity_error],
@@ -611,7 +612,8 @@ def display_list_gen(value_list, error_list, rounding_function):
         decimal_places = str(rounded_value)[::-1].find(".")
         try:
             rounded_error = f'{error:.{decimal_places}f}'
-        except ValueError:  # numbers before decimal in value > significant figs
+        except ValueError:
+            # Case: numbers before decimal in value > significant figs
             rounded_error = f'{error:4g}'
         display_list = np.append(display_list,
                                  [[rounded_value, rounded_error]],
@@ -762,7 +764,8 @@ def data_point_plotter(data_array, predicted_function, parameters,
                        xycoords='axes fraction', textcoords='offset points',
                        va='top', fontsize='10', weight='bold')
     main_axes.annotate(rf'$m_p = ({display_values[4][0]} \pm '
-                       rf'{display_values[4][1]})$AU',
+                       rf'{display_values[4][1]})$'
+                       r'M$_{\mathrm{J}}$',
                        (0.5, 0), (-60, -55),
                        xycoords='axes fraction', textcoords='offset points',
                        va='top', fontsize='10')
